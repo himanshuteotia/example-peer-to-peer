@@ -438,3 +438,18 @@ MIT License - see LICENSE file for details
 
 
 **Note**: This implementation focuses on the core triage functionality as specified in the requirements. The system is designed to be extensible and can be enhanced with additional features as needed.
+
+
+
+image.png
+
+## Comment:
+Most of my time was spent debugging the CHANNEL_CLOSED issue between the client and server.
+For now, I’ve worked around it by manually starting the DHT node using:
+
+`npx hyperdht bootstrap`
+
+
+With this command running, everything works correctly.
+I also tested on other setups to verify if this issue is specific to my local environment.
+I’ll need some more time to fully automate the bootstrap initialization and eliminate the manual step.
