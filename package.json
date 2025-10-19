@@ -16,11 +16,11 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@hyperswarm/rpc": "^1.0.0",
-    "hyperdht": "^6.0.0",
-    "hypercore": "^10.0.0",
-    "hyperbee": "^1.0.0",
-    "node-llama-cpp": "^2.0.0"
+    "@hyperswarm/rpc": "^3.4.0",
+    "hyperdht": "^6.27.0",
+    "hypercore": "^11.18.3",
+    "hyperbee": "^2.26.5",
+    "node-llama-cpp": "^3.14.0"
   },
   "engines": {
     "node": ">=18.0.0"

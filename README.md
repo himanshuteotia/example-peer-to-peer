@@ -27,10 +27,7 @@ npm install
 npm run simple-demo
 ```
 
-Or try the RPC demo (may have connection issues in local environment):
-```bash
-npm run working-demo
-```
+**Note**: The RPC demos (`npm run demo`, `npm run working-demo`, `npm run rpc-test`) may have connection issues in local testing environments due to DHT bootstrap configuration. This is a known limitation of Hyperswarm RPC in development setups.
 
 ## 📋 Available Scripts
 
@@ -392,7 +389,7 @@ The system includes a scheduler that runs every 60 seconds to:
 
 1. **LLM Dependency**: The system works without LLM but provides better summaries with it
 2. **Model Path**: Requires manual configuration of GGUF model path
-3. **RPC Connection Issues**: Local testing of RPC functionality may have connection issues due to DHT bootstrap configuration
+3. **RPC Connection Issues**: Local testing of RPC functionality has connection issues due to DHT bootstrap configuration (tested with latest packages: @hyperswarm/rpc 3.4.0, hyperdht 6.27.0)
 4. **Network Discovery**: Relies on bootstrap DHT nodes for peer discovery
 5. **Storage Persistence**: Database files are stored locally and not replicated
 
