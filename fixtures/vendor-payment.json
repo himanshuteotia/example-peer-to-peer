@@ -1,0 +1,20 @@
+{
+  "type": "vendor payment",
+  "description": "Payment for cloud infrastructure services - AWS monthly bill",
+  "value": 15000,
+  "currency": "USD",
+  "recipient": {
+    "address": "0x9876543210987654321098765432109876543210",
+    "name": "Amazon Web Services",
+    "verified": true,
+    "whitelisted": true
+  },
+  "deadline": "2024-12-20T00:00:00Z",
+  "requiredApprovals": 2,
+  "approvals": [],
+  "metadata": {
+    "vendor": "AWS",
+    "service": "cloud-infrastructure",
+    "invoiceNumber": "INV-2024-12-001"
+  }
+}

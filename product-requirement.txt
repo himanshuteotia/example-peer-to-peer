@@ -1,0 +1,184 @@
+The Multisig Ticket Triage Challenge
+Hi and congratulations to your progress with Tether!
+Goal: Build a P2P service that triages multisig-style transaction tickets (e.g., “Pay for
+some services”, “Update treasury with coins”, “Employees payouts”). Peers submit
+tickets over Hyperswarm RPC; your service validates, scores urgency, provides a
+concise summary/tags, and (optionally) emits a Safe-compatible transaction hint for
+human operators. Persist data with Hypercore/Hyperbee. Runs with local GGUF LLM
+model.
+Timebox: 6–8 hours.
+Requirements
+● Code should be only in Javascript!
+● There's no need for a UI!
+● Clients should be able to access data, even if initial server went offline
+● Design your own ticket and RPC formats
+● Compute a deterministic base urgency index with an auditable breakdown using factors
+like value/USD (or “unknown”), deadline proximity, approvals gap, etc.
+● Use local GGUF LLM to adjust the urgency score
+● Storage: Hyperbee for quick lookups (by ticket ID, by time, maybe by urgency), data
+update
+● Expose RPC to submit a ticket and get a triage result, fetch by ticket ID, and optionally
+search by time window and/or minimum urgency (names/payloads up to you).
+● Provide both on-demand triage and a simple scheduler (≈60s) to re-triage
+pending/near-deadline tickets and update indices.
+● Take into account that topic of the transaction is not deterministic and is a custom natural
+language
+● Provide a single example script (e.g., scripts/demo.js) that starts the triage
+server in-process, then acts as a client to (1) submit 2–3 sample tickets (from fixtures
+or inline) and log each triage result as JSON, (2) fetch one ticket by ID and log the
+result, and (3) run a basic search (by time range and/or min urgency) and log the rows;
+finally gracefully shut down RPC/DHT/server. No UI, no interactivity—just clear
+console logs with labeled sections.
+Deliverables
+● Runnable repo (Node ≥18) with package.json scripts (demo, start, test, clean).
+● Server/Client code (folder of your choice) exposing Hyperswarm RPC handlers and the
+scheduler; small config via env/JSON.
+● Storage setup using Hypercore/Hyperbee;
+
+JavaScript
+● Fixtures: 6–10 representative ticket JSON files (payroll, vendor, treasury, new recipient,
+bridged, unknown USD, threshold met, low-urgency, etc.).
+● README covering quickstart, how the demo works, your ticket/RPC formats,
+deterministic scoring factors/weights, LLM prompt notes, and known limitations/next
+steps.
+If you don't get to the end, just write up what is missing for a complete implementation of the
+task. Also, if your implementation has limitation and issues, that's no big deal. Just write
+everything down and indicate how you could solve them, given there was more time.
+Good luck!
+Tips / Useful Resources
+● https://www.npmjs.com/package/@hyperswarm/rpc
+● https://docs.holepunch.to/building-blocks/hyperbee
+● https://docs.holepunch.to/building-blocks/hypercore
+● https://docs.holepunch.to/building-blocks/hyperdht
+● https://www.npmjs.com/package/hp-rpc-cli
+● https://node-llama-cpp.withcat.ai/
+
+'use strict';
+
+const RPC = require('@hyperswarm/rpc');
+const DHT = require('hyperdht');
+const Hypercore = require('hypercore');
+const Hyperbee = require('hyperbee');
+const crypto = require('crypto');
+
+const main = async () => {
+// hyperbee db
+const hcore = new Hypercore('./db/rpc-server');
+const hbee = new Hyperbee(hcore, { keyEncoding: 'utf-8', valueEncoding:
+'binary' });
+await hbee.ready();
+
+// resolved distributed hash table seed for key pair
+let dhtSeed = (await hbee.get('dht-seed'))?.value;
+
+if (!dhtSeed) {
+// not found, generate and store in db
+dhtSeed = crypto.randomBytes(32);
+await hbee.put('dht-seed', dhtSeed);
+}
+
+// start distributed hash table, it is used for rpc service discovery
+const dht = new DHT({
+port: 40001,
+keyPair: DHT.keyPair(dhtSeed),
+bootstrap: [{ host: '127.0.0.1', port: 30001 }] // note boostrap points to
+dht that is started via cli
+});
+await dht.ready();
+
+// resolve rpc server seed for key pair
+let rpcSeed = (await hbee.get('rpc-seed'))?.value;
+if (!rpcSeed) {
+rpcSeed = crypto.randomBytes(32);
+await hbee.put('rpc-seed', rpcSeed);
+}
+
+// setup rpc server
+const rpc = new RPC({ seed: rpcSeed, dht });
+const rpcServer = rpc.createServer();
+await rpcServer.listen();
+console.log('rpc server started listening on public key:',
+rpcServer.publicKey.toString('hex'));
+// rpc server started listening on public key:
+763cdd329d29dc35326865c4fa9bd33a45fdc2d8d2564b11978ca0d022a44a19
+
+// bind handlers to rpc server
+rpcServer.respond('ping', async (reqRaw) => {
+// reqRaw is Buffer, we need to parse it
+const req = JSON.parse(reqRaw.toString('utf-8'));
+
+const resp = { nonce: req.nonce + 1 };
+
+// we also need to return buffer response
+const respRaw = Buffer.from(JSON.stringify(resp), 'utf-8');
+return respRaw;
+});
+};
+
+main().catch(console.error);
+```
+
+Client code:
+
+```js
+'use strict';
+
+const RPC = require('@hyperswarm/rpc');
+const DHT = require('hyperdht');
+const Hypercore = require('hypercore');
+const Hyperbee = require('hyperbee');
+const crypto = require('crypto');
+
+const main = async () => {
+// hyperbee db
+const hcore = new Hypercore('./db/rpc-client');
+const hbee = new Hyperbee(hcore, { keyEncoding: 'utf-8', valueEncoding:
+'binary' });
+await hbee.ready();
+
+// resolved distributed hash table seed for key pair
+let dhtSeed = (await hbee.get('dht-seed'))?.value;
+if (!dhtSeed) {
+// not found, generate and store in db
+dhtSeed = crypto.randomBytes(32);
+await hbee.put('dht-seed', dhtSeed);
+}
+
+// start distributed hash table, it is used for rpc service discovery
+const dht = new DHT({
+
+port: 50001,
+keyPair: DHT.keyPair(dhtSeed),
+bootstrap: [{ host: '127.0.0.1', port: 30001 }] // note boostrap points to
+dht that is started via cli
+});
+await dht.ready();
+
+// public key of rpc server, used instead of address, the address is
+discovered via dht
+const serverPubKey = Buffer.from(
+'763cdd329d29dc35326865c4fa9bd33a45fdc2d8d2564b11978ca0d022a44a19',
+'hex'
+);
+
+// rpc lib
+const rpc = new RPC({ dht });
+
+// payload for request
+const payload = { nonce: 126 };
+const payloadRaw = Buffer.from(JSON.stringify(payload), 'utf-8');
+
+// sending request and handling response
+// see console output on server code for public key as this changes on
+different instances
+const respRaw = await rpc.request(serverPubKey, 'ping', payloadRaw);
+const resp = JSON.parse(respRaw.toString('utf-8'));
+console.log(resp); // { nonce: 127 }
+
+// closing connection
+await rpc.destroy();
+await dht.destroy();
+};
+
+main().catch(console.error);
+```

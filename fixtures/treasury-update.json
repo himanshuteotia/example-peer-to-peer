@@ -1,0 +1,31 @@
+{
+  "type": "treasury management",
+  "description": "Update treasury allocation - Move 50% of USDC to yield farming protocol",
+  "value": 5000000,
+  "currency": "USDC",
+  "recipient": {
+    "address": "0x4567890123456789012345678901234567890123",
+    "name": "Compound Protocol",
+    "verified": true,
+    "whitelisted": false
+  },
+  "deadline": "2024-12-25T12:00:00Z",
+  "requiredApprovals": 4,
+  "approvals": [
+    {
+      "approver": "0x1111111111111111111111111111111111111111",
+      "timestamp": "2024-12-15T14:20:00Z",
+      "signature": "0x123456..."
+    },
+    {
+      "approver": "0x2222222222222222222222222222222222222222",
+      "timestamp": "2024-12-15T15:45:00Z",
+      "signature": "0x789abc..."
+    }
+  ],
+  "metadata": {
+    "strategy": "yield-farming",
+    "riskLevel": "medium",
+    "expectedAPY": "8.5%"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "type": "bridge transaction",
+  "description": "Bridge 1000 ETH from Ethereum to Polygon for DeFi operations",
+  "value": 1000,
+  "currency": "ETH",
+  "recipient": {
+    "address": "0x3333333333333333333333333333333333333333",
+    "name": "Polygon Bridge",
+    "verified": true,
+    "whitelisted": true
+  },
+  "deadline": "2024-12-22T10:00:00Z",
+  "requiredApprovals": 2,
+  "approvals": [
+    {
+      "approver": "0x4444444444444444444444444444444444444444",
+      "timestamp": "2024-12-15T16:30:00Z",
+      "signature": "0xdef456..."
+    }
+  ],
+  "metadata": {
+    "sourceChain": "ethereum",
+    "targetChain": "polygon",
+    "bridgeProtocol": "Polygon Bridge",
+    "gasEstimate": "0.05 ETH"
+  }
+}

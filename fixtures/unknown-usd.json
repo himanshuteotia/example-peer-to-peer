@@ -1,0 +1,20 @@
+{
+  "type": "miscellaneous",
+  "description": "Payment for unknown service - details to be clarified",
+  "value": null,
+  "currency": "USD",
+  "recipient": {
+    "address": "0x6666666666666666666666666666666666666666",
+    "name": "Unknown Vendor",
+    "verified": false,
+    "whitelisted": false
+  },
+  "deadline": null,
+  "requiredApprovals": 2,
+  "approvals": [],
+  "metadata": {
+    "notes": "Value and deadline unknown - requires clarification",
+    "priority": "low",
+    "requiresReview": true
+  }
+}

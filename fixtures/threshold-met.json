@@ -1,0 +1,31 @@
+{
+  "type": "emergency withdrawal",
+  "description": "Emergency withdrawal - Security incident response",
+  "value": 100000,
+  "currency": "USDC",
+  "recipient": {
+    "address": "0x7777777777777777777777777777777777777777",
+    "name": "Emergency Fund",
+    "verified": true,
+    "whitelisted": true
+  },
+  "deadline": "2024-12-16T08:00:00Z",
+  "requiredApprovals": 2,
+  "approvals": [
+    {
+      "approver": "0x8888888888888888888888888888888888888888",
+      "timestamp": "2024-12-15T20:15:00Z",
+      "signature": "0xabc123..."
+    },
+    {
+      "approver": "0x9999999999999999999999999999999999999999",
+      "timestamp": "2024-12-15T20:45:00Z",
+      "signature": "0xdef789..."
+    }
+  ],
+  "metadata": {
+    "incidentType": "security-breach",
+    "severity": "critical",
+    "approvalThreshold": "met"
+  }
+}

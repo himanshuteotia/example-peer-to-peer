@@ -1,0 +1,28 @@
+{
+  "name": "multisig-ticket-triage",
+  "version": "1.0.0",
+  "description": "P2P multisig ticket triage service using Hyperswarm RPC and Hyperbee storage",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node scripts/demo.js",
+    "working-demo": "node scripts/working-demo.js",
+    "simple-demo": "node scripts/simple-demo.js",
+    "test": "node scripts/test.js",
+    "clean": "rm -rf db/ node_modules/ package-lock.json"
+  },
+  "keywords": ["multisig", "triage", "hyperswarm", "hyperbee", "p2p"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@hyperswarm/rpc": "^1.0.0",
+    "hyperdht": "^6.0.0",
+    "hypercore": "^10.0.0",
+    "hyperbee": "^1.0.0",
+    "node-llama-cpp": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

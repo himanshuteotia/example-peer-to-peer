@@ -1,0 +1,26 @@
+{
+  "type": "payroll",
+  "description": "Monthly salary payments for all employees - Q4 2024",
+  "value": 250000,
+  "currency": "USD",
+  "recipient": {
+    "address": "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6",
+    "name": "Payroll Contract",
+    "verified": true,
+    "whitelisted": true
+  },
+  "deadline": "2024-12-31T23:59:59Z",
+  "requiredApprovals": 3,
+  "approvals": [
+    {
+      "approver": "0x1234567890123456789012345678901234567890",
+      "timestamp": "2024-12-15T10:30:00Z",
+      "signature": "0xabcdef..."
+    }
+  ],
+  "metadata": {
+    "department": "HR",
+    "payrollPeriod": "2024-Q4",
+    "employeeCount": 45
+  }
+}

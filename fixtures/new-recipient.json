@@ -1,0 +1,22 @@
+{
+  "type": "new recipient payment",
+  "description": "First payment to new vendor - Security audit services",
+  "value": 75000,
+  "currency": "USD",
+  "recipient": {
+    "address": "0x5555555555555555555555555555555555555555",
+    "name": "SecureAudit Inc.",
+    "verified": false,
+    "isNew": true,
+    "whitelisted": false
+  },
+  "deadline": "2024-12-18T17:00:00Z",
+  "requiredApprovals": 3,
+  "approvals": [],
+  "metadata": {
+    "vendor": "SecureAudit Inc.",
+    "service": "security-audit",
+    "contractValue": 75000,
+    "riskAssessment": "pending"
+  }
+}

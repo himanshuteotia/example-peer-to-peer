@@ -1,0 +1,26 @@
+{
+  "type": "urgent payment",
+  "description": "Urgent payment for legal fees - court deadline approaching",
+  "value": 25000,
+  "currency": "USD",
+  "recipient": {
+    "address": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "name": "Legal Associates LLP",
+    "verified": true,
+    "whitelisted": true
+  },
+  "deadline": "2024-12-16T09:00:00Z",
+  "requiredApprovals": 2,
+  "approvals": [
+    {
+      "approver": "0xcccccccccccccccccccccccccccccccccccccccc",
+      "timestamp": "2024-12-15T21:00:00Z",
+      "signature": "0x456def..."
+    }
+  ],
+  "metadata": {
+    "legalMatter": "contract-dispute",
+    "courtDate": "2024-12-16T10:00:00Z",
+    "urgency": "critical"
+  }
+}
