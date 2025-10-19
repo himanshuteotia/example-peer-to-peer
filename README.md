@@ -27,7 +27,23 @@ npm install
 npm run simple-demo
 ```
 
-**Note**: The RPC demos (`npm run demo`, `npm run working-demo`, `npm run rpc-test`) may have connection issues in local testing environments due to DHT bootstrap configuration. This is a known limitation of Hyperswarm RPC in development setups.
+**Note**: The RPC demos (`npm run demo`, `npm run working-demo`) have connection issues in local testing environments due to DHT bootstrap configuration. This is a known limitation of Hyperswarm RPC in development setups, even with the latest packages (@hyperswarm/rpc 3.4.0, hyperdht 6.27.0).
+
+Tried on docker as well facing same error :
+
+Build the container image:
+
+`docker build -f Dockerfile.demo -t multisig-test-native .`
+
+
+Run the working demo:
+
+# Use a fresh database directory to avoid cross-platform issues
+
+`mkdir -p ./db`
+
+`docker run --rm -it -v "$(pwd)/db:/app/db" --name multisig-working multisig-test-native`
+
 
 ## 📋 Available Scripts
 

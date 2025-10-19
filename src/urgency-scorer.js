@@ -21,6 +21,12 @@ export class UrgencyScorer {
 
       // Try to load the model, but don't fail if it's not available
       try {
+        // Check if the model file exists first
+        const fs = await import("fs");
+        if (!fs.existsSync(this.config.modelPath)) {
+          throw new Error(`Model file not found: ${this.config.modelPath}`);
+        }
+
         this.model = new LlamaModel({
           modelPath: this.config.modelPath,
         });
@@ -223,18 +229,23 @@ export class UrgencyScorer {
   }
 
   async getLLMUrgencyAdjustment(ticket, baseUrgency) {
-    if (!this.initialized) {
+    if (!this.initialized || !this.session) {
       throw new Error("LLM not initialized");
     }
 
-    const prompt = this.buildUrgencyPrompt(ticket, baseUrgency);
+    try {
+      const prompt = this.buildUrgencyPrompt(ticket, baseUrgency);
 
-    const response = await this.session.prompt(prompt, {
-      maxTokens: 200,
-      temperature: 0.3,
-    });
+      const response = await this.session.prompt(prompt, {
+        maxTokens: 200,
+        temperature: 0.3,
+      });
 
-    return this.parseLLMResponse(response);
+      return this.parseLLMResponse(response);
+    } catch (error) {
+      console.warn("LLM adjustment failed:", error.message);
+      throw error;
+    }
   }
 
   buildUrgencyPrompt(ticket, baseUrgency) {
