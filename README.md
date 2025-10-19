@@ -14,7 +14,7 @@ A P2P service that triages multisig-style transaction tickets using Hyperswarm R
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd multi-sig
+cd multisig-triage-exact
 ```
 
 2. Install dependencies:
