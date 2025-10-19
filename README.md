@@ -418,15 +418,5 @@ The system includes a scheduler that runs every 60 seconds to:
 
 MIT License - see LICENSE file for details
 
-## 🆘 Support
-
-For issues and questions:
-
-1. Check the test suite for usage examples
-2. Review the demo script for complete workflow
-3. Examine the fixture files for ticket format examples
-4. Open an issue on the repository
-
----
 
 **Note**: This implementation focuses on the core triage functionality as specified in the requirements. The system is designed to be extensible and can be enhanced with additional features as needed.
