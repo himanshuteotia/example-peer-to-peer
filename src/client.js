@@ -7,15 +7,38 @@ import Hyperbee from "hyperbee";
 import crypto from "crypto";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { readFile } from "fs/promises";
+
+let config = {};
+try {
+  const raw = await readFile(
+    new URL("../config.json", import.meta.url),
+    "utf8"
+  );
+  config = JSON.parse(raw);
+} catch (err) {
+  // not fatal — we'll use defaults
+  // console.warn("config.json not found; using defaults");
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const SERVICE_TOPIC = crypto
+  .createHash("sha256")
+  .update("triage-rpc-service")
+  .digest();
+const DEFAULT_BOOTSTRAP_PORT = Number(
+  process.env.BOOTSTRAP_PORT || config.bootstrapPort || 30001
+);
+const LOOKUP_RETRIES = Number(process.env.LOOKUP_RETRIES || 6);
+const LOOKUP_DELAY_MS = Number(process.env.LOOKUP_DELAY_MS || 1000);
 
 export class TriageClient {
   constructor(config = {}) {
     this.config = {
       port: config.port || 50001,
-      bootstrapPort: config.bootstrapPort || 30001,
+      bootstrapPort: DEFAULT_BOOTSTRAP_PORT,
       dbPath: config.dbPath || join(__dirname, "../db/rpc-client"),
       serverPublicKey: config.serverPublicKey,
       ...config,
@@ -33,14 +56,49 @@ export class TriageClient {
     // Initialize storage
     await this.initializeStorage();
 
-    // Start DHT
+    // Start DHT and discovery
     await this.startDHT();
 
-    // Initialize RPC
+    // Initialize RPC (use the DHT instance)
     this.rpc = new RPC({ dht: this.dht });
 
-    // Wait a moment for DHT to be ready
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // small pause for DHT/RPC internals
+    await new Promise((r) => setTimeout(r, 300));
+
+    // If serverPublicKey not provided, attempt discovery via the shared topic
+    if (!this.config.serverPublicKey) {
+      console.log("🔎 Looking up server via DHT topic...");
+      const nodes = await this.lookupWithRetry(
+        SERVICE_TOPIC,
+        LOOKUP_RETRIES,
+        LOOKUP_DELAY_MS
+      );
+
+      if (nodes.length === 0) {
+        console.warn(
+          "⚠️ No nodes found for topic — ensure the server announced and DHT bootstrap is correct."
+        );
+      } else {
+        // pick the first node that has a publicKey
+        const node = nodes.find((n) => n && (n.publicKey || n));
+        if (node) {
+          const pub = node.publicKey ? node.publicKey : node;
+          // normalize: if pub is hex string, convert to Buffer
+          this.config.serverPublicKey =
+            typeof pub === "string"
+              ? Buffer.from(pub, "hex")
+              : Buffer.from(pub);
+          console.log(
+            "✅ Found server publicKey via DHT lookup:",
+            this.config.serverPublicKey.toString("hex")
+          );
+        }
+      }
+    }
+
+    if (!this.config.serverPublicKey) {
+      throw new Error("Server public key not configured and discovery failed");
+    }
 
     this.connected = true;
     console.log("✅ Connected to Triage Server");
@@ -64,13 +122,68 @@ export class TriageClient {
       await this.hbee.put("dht-seed", dhtSeed);
     }
 
+    const bootstrapPort = this.config.bootstrapPort || DEFAULT_BOOTSTRAP_PORT;
+
     this.dht = new DHT({
       port: this.config.port,
       keyPair: DHT.keyPair(dhtSeed),
-      bootstrap: [{ host: "127.0.0.1", port: this.config.bootstrapPort }],
+      bootstrap: [{ host: "127.0.0.1", port: bootstrapPort }],
     });
 
     await this.dht.ready();
+    console.log("✅ DHT started (bootstrapped to port " + bootstrapPort + ")");
+  }
+
+  // lookup that supports both promise/array returns and stream-like returns
+  async lookupWithRetry(
+    topic,
+    retries = LOOKUP_RETRIES,
+    delayMs = LOOKUP_DELAY_MS
+  ) {
+    const tryOnce = async () => {
+      try {
+        const res = await this.dht.lookup(topic);
+
+        // stream-like result (EventEmitter)
+        if (res && typeof res.on === "function") {
+          return await new Promise((resolve) => {
+            const nodes = [];
+            const timer = setTimeout(() => {
+              res.removeAllListeners("data");
+              res.removeAllListeners("end");
+              resolve(nodes);
+            }, 800);
+
+            res.on("data", (d) => {
+              nodes.push(d);
+            });
+
+            res.on("end", () => {
+              clearTimeout(timer);
+              resolve(nodes);
+            });
+
+            res.on("error", () => {
+              clearTimeout(timer);
+              resolve(nodes);
+            });
+          });
+        }
+
+        // array or single object
+        const nodes = Array.isArray(res) ? res : res ? [res] : [];
+        return nodes;
+      } catch {
+        return [];
+      }
+    };
+
+    for (let i = 0; i < retries; i++) {
+      const nodes = await tryOnce();
+      if (nodes.length) return nodes;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+    return [];
   }
 
   async submitTicket(ticket) {
@@ -172,19 +285,16 @@ export class TriageClient {
         "ping",
         payloadRaw
       );
-
       const response = JSON.parse(respRaw.toString("utf-8"));
       return response;
     } catch (error) {
       console.warn("Ping failed, retrying in 1 second...", error.message);
       await new Promise((resolve) => setTimeout(resolve, 1000));
-
       const respRaw = await this.rpc.request(
         this.config.serverPublicKey,
         "ping",
         payloadRaw
       );
-
       const response = JSON.parse(respRaw.toString("utf-8"));
       return response;
     }

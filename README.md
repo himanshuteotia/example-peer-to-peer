@@ -22,6 +22,11 @@ cd multisig-triage-exact
 npm install
 ```
 
+Start a HyperDHT bootstrap node (required for RPC demos)
+For the RPC demos to discover peers locally you need a bootstrap DHT node running. Open a terminal and run:
+
+`npx hyperdht bootstrap`
+
 3. Run the simple demo (recommended - fully working):
 ```bash
 npm run simple-demo

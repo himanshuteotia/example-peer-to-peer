@@ -5,9 +5,34 @@ import { TriageClient } from "../src/client.js";
 import DHT from "hyperdht";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { readFile } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// load config.json at project root (if missing, fallback to defaults)
+let config = {};
+try {
+  const cfgRaw = await readFile(
+    new URL("../config.json", import.meta.url),
+    "utf8"
+  );
+  config = JSON.parse(cfgRaw);
+} catch (err) {
+  // Not fatal — we'll use defaults below
+  console.warn(
+    "⚠️  config.json not found or unreadable. Using defaults. Error:",
+    err.message
+  );
+}
+
+const BOOTSTRAP_PORT = Number(
+  process.env.BOOTSTRAP_PORT || config.bootstrapPort || 30001
+);
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 // Sample tickets for testing
 const sampleTickets = [
@@ -85,15 +110,15 @@ async function workingDemo() {
 
   try {
     // ========================================
-    // 1. Start bootstrap DHT node
+    // 1. Start bootstrap DHT node (in-process)
     // ========================================
-    console.log("🌐 Starting Bootstrap DHT Node...");
+    console.log(`🌐 Starting Bootstrap DHT Node on port ${BOOTSTRAP_PORT}...`);
     bootstrapDHT = new DHT({
-      port: 30001,
+      port: BOOTSTRAP_PORT,
       bootstrap: [],
     });
     await bootstrapDHT.ready();
-    console.log("✅ Bootstrap DHT started on port 30001\n");
+    console.log(`✅ Bootstrap DHT started on port ${BOOTSTRAP_PORT}\n`);
 
     // ========================================
     // 2. Start the triage server
@@ -101,15 +126,25 @@ async function workingDemo() {
     console.log("📡 Starting Triage Server...");
     server = new TriageServer({
       port: 40001,
-      bootstrapPort: 30001,
+      bootstrapPort: BOOTSTRAP_PORT,
       dbPath: join(__dirname, "../db/working-demo-server"),
     });
 
     await server.start();
-    serverPublicKey = server.rpcServer.publicKey;
+
+    // ensure server.rpcServer.publicKey exists and is a Buffer
+    if (!server.rpcServer || !server.rpcServer.publicKey) {
+      throw new Error(
+        "Server RPC publicKey not available after server.start()"
+      );
+    }
+    serverPublicKey = Buffer.from(server.rpcServer.publicKey);
     console.log(
       `✅ Server started with public key: ${serverPublicKey.toString("hex")}\n`
     );
+
+    // small pause so announce has a moment to propagate to the bootstrap node
+    await sleep(500);
 
     // ========================================
     // 3. Initialize client and connect
@@ -117,7 +152,7 @@ async function workingDemo() {
     console.log("🔗 Initializing Client...");
     client = new TriageClient({
       port: 50001,
-      bootstrapPort: 30001,
+      bootstrapPort: BOOTSTRAP_PORT,
       dbPath: join(__dirname, "../db/working-demo-client"),
       serverPublicKey: serverPublicKey,
     });
@@ -127,7 +162,7 @@ async function workingDemo() {
 
     // Wait for DHT to stabilize and discover the server
     console.log("⏳ Waiting for DHT to stabilize and discover server...");
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await sleep(3000);
 
     // ========================================
     // 4. Test ping functionality
@@ -280,7 +315,7 @@ async function workingDemo() {
     // 8. Test scheduler (wait a bit and check for updates)
     // ========================================
     console.log("⏰ Testing scheduler (waiting 3 seconds for re-triaging)...");
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await sleep(3000);
 
     if (submittedTickets.length > 0) {
       console.log("Checking if tickets were re-triaged...");
@@ -327,16 +362,28 @@ async function workingDemo() {
     // ========================================
     console.log("\n🛑 Shutting down gracefully...");
 
-    if (client) {
-      await client.disconnect();
+    try {
+      if (client) {
+        await client.disconnect();
+      }
+    } catch (e) {
+      console.warn("Error disconnecting client:", e.message);
     }
 
-    if (server) {
-      await server.stop();
+    try {
+      if (server) {
+        await server.stop();
+      }
+    } catch (e) {
+      console.warn("Error stopping server:", e.message);
     }
 
-    if (bootstrapDHT) {
-      await bootstrapDHT.destroy();
+    try {
+      if (bootstrapDHT) {
+        await bootstrapDHT.destroy();
+      }
+    } catch (e) {
+      console.warn("Error destroying bootstrap DHT:", e.message);
     }
 
     console.log("✅ Shutdown complete");

@@ -1,0 +1,59 @@
+# Dockerfile.test — robust (bookworm base + sodium-native binding patch)
+FROM node:20-bookworm
+
+WORKDIR /app
+
+# Install system build tools & libsodium
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    python3-dev \
+    pkg-config \
+    cmake \
+    git \
+    wget \
+    libsodium-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy package metadata for caching
+COPY package.json package-lock.json* ./
+
+# Remove heavy native LLM dependency (if present)
+RUN node -e "\
+    const fs=require('fs'); \
+    const p=JSON.parse(fs.readFileSync('package.json','utf8')); \
+    ['node-llama-cpp','some-other-llm-if-present'].forEach(k=>{ \
+    if(p.dependencies&&p.dependencies[k]) delete p.dependencies[k]; \
+    if(p.optionalDependencies&&p.optionalDependencies[k]) delete p.optionalDependencies[k]; \
+    if(p.devDependencies&&p.devDependencies[k]) delete p.devDependencies[k]; \
+    }); \
+    fs.writeFileSync('package.json', JSON.stringify(p, null, 2)); \
+    console.log('Sanitized package.json (removed heavy LLM natives if present)');"
+
+# Prefer prebuilt binaries (fast). If you want to force compile, set this true.
+ENV npm_config_build_from_source=false
+
+# Install node modules
+RUN npm install --legacy-peer-deps
+
+# Patch sodium-native binding.js (use bash -lc with heredoc so quoting is safe)
+RUN if [ -d node_modules/sodium-native ]; then \
+    bash -lc "cat > node_modules/sodium-native/binding.js <<'JS'\nconst path = require('path');\nconst plat = process.platform;\nconst arch = process.arch;\nconst map = {\n  'linux-arm64': 'prebuilds/linux-arm64/sodium-native.node',\n  'linux-x64':  'prebuilds/linux-x64/sodium-native.node',\n  'darwin-arm64':'prebuilds/darwin-arm64/sodium-native.node',\n  'darwin-x64':'prebuilds/darwin-x64/sodium-native.node',\n  'win32-x64': 'prebuilds/win32-x64/sodium-native.node',\n  'win32-arm64': 'prebuilds/win32-arm64/sodium-native.node'\n};\nconst candidate = map[`${plat}-${arch}`];\nif (candidate) {\n  try {\n    module.exports = require(path.join(__dirname, candidate));\n    return;\n  } catch (e) {\n    /* fallthrough */\n  }\n}\ntry {\n  module.exports = require(path.join(__dirname, 'addon.node'));\n} catch (err) {\n  throw new Error('sodium-native: cannot find native addon for ' + plat + '-' + arch + '. Tried ' + (candidate || 'addon.node') + ' - ' + err.message);\n}\nJS"; \
+    chmod 644 node_modules/sodium-native/binding.js; \
+    else echo 'sodium-native not present; skipping binding patch'; fi
+
+# Copy application files
+COPY . .
+
+# Ensure your working-demo uses the same DB path used by the project: map host ./db to /app/db
+# Expose ports only if you want to reach the DHT/RPC from outside (not required for single-container run)
+# EXPOSE 30001 40001 50001
+
+ENV NODE_ENV=development
+# Optional: enable verbose debug for protomux/hyperswarm if you want more logs
+ENV DEBUG=protomux*,@hyperswarm*,hyperdht*
+
+# Default command — run the working demo
+CMD ["npm", "run", "working-demo"]
+

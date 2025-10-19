@@ -9,15 +9,62 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { UrgencyScorer } from "./urgency-scorer.js";
 import { TicketStorage } from "./ticket-storage.js";
+import { readFile } from "fs/promises";
+
+let config = {};
+try {
+  const raw = await readFile(
+    new URL("../config.json", import.meta.url),
+    "utf8"
+  );
+  config = JSON.parse(raw);
+} catch (err) {
+  // not fatal — fall back to defaults
+  console.warn(
+    "⚠️  config.json not found or unreadable; using defaults.",
+    err.message
+  );
+}
+
+const DEFAULT_BOOTSTRAP_PORT = Number(config.bootstrapPort || 30001);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const SERVICE_TOPIC = crypto
+  .createHash("sha256")
+  .update("triage-rpc-service")
+  .digest(); // 32 bytes
+
+// helper: announce with retries and optional relay addresses
+async function announceWithRetry(
+  dht,
+  topic,
+  keyPair,
+  relays = [],
+  retries = 6,
+  delayMs = 800
+) {
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      await dht.announce(topic, keyPair, relays);
+      return;
+    } catch (err) {
+      lastErr = err;
+      console.warn(`announce attempt ${i + 1} failed: ${err.message}`);
+      // small backoff
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
+}
 
 class TriageServer {
   constructor(config = {}) {
     this.config = {
       port: config.port || 40001,
-      bootstrapPort: config.bootstrapPort || 30001,
+      bootstrapPort: DEFAULT_BOOTSTRAP_PORT,
       dbPath: config.dbPath || join(__dirname, "../db/rpc-server"),
       ...config,
     };
@@ -29,6 +76,9 @@ class TriageServer {
     this.urgencyScorer = null;
     this.ticketStorage = null;
     this.scheduler = null;
+
+    // stash rpc seed if needed for announce
+    this._rpcSeed = null;
   }
 
   async start() {
@@ -84,14 +134,16 @@ class TriageServer {
       await this.hbee.put("dht-seed", dhtSeed);
     }
 
+    const bootstrapPort = this.config.bootstrapPort || DEFAULT_BOOTSTRAP_PORT;
+
     this.dht = new DHT({
       port: this.config.port,
       keyPair: DHT.keyPair(dhtSeed),
-      bootstrap: [{ host: "127.0.0.1", port: this.config.bootstrapPort }],
+      bootstrap: [{ host: "127.0.0.1", port: bootstrapPort }],
     });
 
     await this.dht.ready();
-    console.log("✅ DHT started");
+    console.log("✅ DHT started (bootstrapped to port " + bootstrapPort + ")");
   }
 
   async startRPC() {
@@ -104,16 +156,52 @@ class TriageServer {
       await this.hbee.put("rpc-seed", rpcSeed);
     }
 
+    // stash seed so we can use it when announcing
+    this._rpcSeed = rpcSeed;
+
+    // Create RPC instance with the seed and the dht
     this.rpc = new RPC({ seed: rpcSeed, dht: this.dht });
     this.rpcServer = this.rpc.createServer();
 
     // Bind RPC handlers
     this.bindHandlers();
 
+    // listen() may accept an optional keyPair; calling without args should still populate publicKey
     await this.rpcServer.listen();
-    console.log("✅ RPC server started");
 
-    // Wait a moment for server to be fully ready
+    if (!this.rpcServer.publicKey) {
+      throw new Error(
+        "rpcServer.publicKey is null after listen(); ensure your @hyperswarm/rpc version exposes it"
+      );
+    }
+
+    console.log("✅ RPC server started - publicKey available");
+
+    // ANNOUNCE: use a stable topic + the RPC keyPair (derived from rpcSeed)
+    // Here we pass the publicKey and secretKey (seed) as the keyPair the server listens on.
+    const rpcKeyPair = {
+      publicKey: this.rpcServer.publicKey,
+      secretKey: this._rpcSeed, // rpcSeed is the secret/seed used to derive RPC keypair
+    };
+
+    // provide bootstrap as relay to improve connectivity and retry if needed
+    const relayAddrs = [
+      {
+        host: "127.0.0.1",
+        port: this.config.bootstrapPort || DEFAULT_BOOTSTRAP_PORT,
+      },
+    ];
+    await announceWithRetry(
+      this.dht,
+      SERVICE_TOPIC,
+      rpcKeyPair,
+      relayAddrs,
+      6,
+      1000
+    );
+    console.log("📡 Announced RPC under service topic on DHT");
+
+    // give the DHT a moment to propagate
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
